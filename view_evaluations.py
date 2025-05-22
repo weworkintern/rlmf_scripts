@@ -16,13 +16,13 @@ DATA_VALS = {
     "intervene prompt": "Intervene User Prompt",
     "final_answer": "Final Answer",
     "ground_truth_answer": "Ground Truth Answer",
-    "abandon_prompt_reason": "Abandon Prompt Reason",
 }
 
 DATA_INFO = [
     "task id",
     "model name",
     "abandon_prompt",
+    "abandon_prompt_reason",
     "temperature",
     "intervention rounds",
     "CoT quality",
@@ -35,6 +35,7 @@ DATA_INFO = [
 print(os.path.join(DATA_DIR, "evaluations.json"))
 df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
+st.set_page_config(layout="wide")
 
 if "button_key_counter" not in st.session_state:
     st.session_state["button_key_counter"] = 0
@@ -157,5 +158,4 @@ for (name, title) in DATA_VALS.items():
         st.markdown(val)
     st.divider()
 
-st.divider()
 st.dataframe(curr_df)
