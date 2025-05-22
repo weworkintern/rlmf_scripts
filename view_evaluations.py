@@ -68,28 +68,60 @@ def search_evaluation():
         print(f"Match index: {match_index}")
         st.session_state["current_index"] = match_index
 
-def parse_tokens(text: str) -> str:
-    tokens = ["abandon", "reason", "intervene"]
-    for token in tokens:
-        token_split = text.split(f"<{token}>")
-        if len(token_split) >= 2:
-            for i in range(len(token_split) - 1):
-                token_split[i] = f"{token_split[i]}\n**{token} {i+1}:**\n"
-            text = "".join(token_split).replace(f"</{token}>", "\n")
-    return text
-
-def parse_bounding(text: str) -> str:
-    split_text = text.split("\n\n")
-    for chunk in split_text:
-        if "**abandon" in chunk:
-            st.error(chunk)
-        elif "**reason" in chunk:
-            st.info(chunk)
-        elif "**intervene" in chunk:
-            st.warning(chunk)
-        else:
-            st.markdown(chunk)
-    return text
+def parse_tokens(text: str) -> None:
+    """Parse text with XML-style tokens and display with appropriate Streamlit styling."""
+    # Process the text until no more tokens are found
+    remaining_text = text
+    token_counts = {
+        "abandon": 0,
+        "reason": 0,
+        "intervene": 0,
+    }
+    while True:
+        # Find the next token
+        next_token_start = float('inf')
+        found_token = None
+        
+        for token in ["abandon", "reason", "intervene"]:
+            start = remaining_text.find(f"<{token}>")
+            if start != -1 and start < next_token_start:
+                next_token_start = start
+                found_token = token
+        
+        if found_token is None:
+            # No more tokens found, display remaining text as markdown
+            if remaining_text.strip():
+                st.markdown(remaining_text.strip())
+            break
+            
+        # Display text before the token
+        if next_token_start > 0:
+            st.markdown(remaining_text[:next_token_start].strip())
+            
+        # Find the end of the token content
+        token_end = remaining_text.find(f"</{found_token}>", next_token_start)
+        if token_end == -1:
+            # If no closing tag, treat rest as normal text
+            st.markdown(remaining_text[next_token_start:].strip())
+            break
+            
+        # Extract the content between tags
+        content_start = next_token_start + len(found_token) + 2  # +2 for "<>"
+        content = remaining_text[content_start:token_end].strip()
+        
+        # Apply appropriate styling based on token type
+        if found_token == "abandon":
+            token_counts["abandon"] += 1
+            st.error(f"**{found_token} {token_counts['abandon']}:**\n{content}")
+        elif found_token == "reason":
+            token_counts["reason"] += 1
+            st.info(f"**{found_token} {token_counts['reason']}:**\n{content}")
+        elif found_token == "intervene":
+            token_counts["intervene"] += 1
+            st.warning(f"**{found_token} {token_counts['intervene']}:**\n{content}")
+            
+        # Update remaining text
+        remaining_text = remaining_text[token_end + len(found_token) + 3:]  # +3 for "</>"
 
 current_index = st.session_state.get("current_index", 0)
 
@@ -126,8 +158,6 @@ for (name, title) in DATA_VALS.items():
     st.header(title)
     val = clean_text(val)
     val = parse_tokens(val)
-    val = parse_bounding(val)
-    # st.markdown(val)
     st.divider()
 
 st.divider()
