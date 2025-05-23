@@ -37,6 +37,10 @@ df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
 st.set_page_config(layout="wide")
 
+evaluations_file = st.file_uploader("Upload evaluations file", type="json")
+if evaluations_file:
+    df = pl.read_json(evaluations_file)
+
 if "button_key_counter" not in st.session_state:
     st.session_state["button_key_counter"] = 0
 
