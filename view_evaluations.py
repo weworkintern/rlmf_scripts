@@ -33,25 +33,14 @@ DATA_INFO = [
 ]
 
 print(os.path.join(DATA_DIR, "evaluations.json"))
-df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
+# df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
+
 
 st.set_page_config(layout="wide")
 
-evaluations_file = st.file_uploader("Upload evaluations file", type="json")
-if evaluations_file:
-    df = pl.read_json(evaluations_file)
-
-if "button_key_counter" not in st.session_state:
-    st.session_state["button_key_counter"] = 0
-
-if "current_index" not in st.session_state:
-    st.session_state["current_index"] = 0
-
-def previous_evaluation():
-    st.session_state["current_index"] -= 1
-
-def next_evaluation():
-    st.session_state["current_index"] += 1
+@st.cache_data
+def read_file(file_path: str) -> pl.DataFrame:
+    return pl.read_json(file_path)
 
 def clean_text(text: str) -> str:
     text = text.replace("\\n", "\n")
@@ -122,44 +111,62 @@ def parse_and_render_text(text: str) -> None:
     if remaining_text:
         st.markdown(remaining_text, unsafe_allow_html=True)
 
+if "button_key_counter" not in st.session_state:
+    st.session_state["button_key_counter"] = 0
+
+if "current_index" not in st.session_state:
+    st.session_state["current_index"] = 0
+
+def previous_evaluation():
+    st.session_state["current_index"] -= 1
+
+def next_evaluation():
+    st.session_state["current_index"] += 1
+
 current_index = st.session_state.get("current_index", 0)
 
-# Buttons to control current index
-col1, col2 = st.columns(2)
-with col1:
-    button("Previous", "ArrowLeft", previous_evaluation, use_container_width=True)
-with col2:
-    button("Next", "ArrowRight", next_evaluation, use_container_width=True)
+evaluations_file = st.file_uploader("Upload evaluations file", type="json")
+if evaluations_file:
+    df = read_file(evaluations_file)
 
-search = st.text_input("Search by task ID", key="search", on_change=search_evaluation)
+    # Buttons to control current index
+    col1, col2 = st.columns(2)
+    with col1:
+        button("Previous", "ArrowLeft", previous_evaluation, use_container_width=True)
+    with col2:
+        button("Next", "ArrowRight", next_evaluation, use_container_width=True)
 
-curr_df = df.slice(current_index, 1)
+    search = st.text_input("Search by task ID", key="search", on_change=search_evaluation)
 
-# Data info
-st.header("Data Info")
-data_info = {key: curr_df.get_column(key).item() for key in DATA_INFO}
-st.table(data_info)
+    curr_df = df.slice(current_index, 1)
 
-# Remarks
-st.header("Remarks")
-remarks = curr_df.get_column("remarks").item()
-remarks = remarks.replace("'", '"')
-st.table((json.loads(remarks)["remarks"]))
+    # Data info
+    st.header("Data Info")
+    data_info = {key: curr_df.get_column(key).item() for key in DATA_INFO}
+    st.table(data_info)
 
-st.divider()
+    # Remarks
+    st.header("Remarks")
+    remarks = curr_df.get_column("remarks").item()
+    remarks = remarks.replace("'", '"')
+    st.table((json.loads(remarks)["remarks"]))
 
-for (name, title) in DATA_VALS.items():
-    val = curr_df.get_column(name).item()
-    if not val:
-        st.header(title)
-        st.write("No value")
-        continue
-    st.header(title)
-    val = clean_text(val)
-    if name == "response":
-        parse_and_render_text(val)
-    else:
-        st.markdown(val)
     st.divider()
 
-st.dataframe(curr_df)
+    for (name, title) in DATA_VALS.items():
+        val = curr_df.get_column(name).item()
+        if not val:
+            st.header(title)
+            st.write("No value")
+            continue
+        st.header(title)
+        val = clean_text(val)
+        if name == "response":
+            parse_and_render_text(val)
+        else:
+            st.markdown(val)
+        st.divider()
+
+    st.dataframe(curr_df)
+else:
+    st.info("Upload an evaluation file to view")
