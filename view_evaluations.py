@@ -176,6 +176,9 @@ if evaluations_file:
             st.write("No value")
             continue
         val = clean_text(val)
+        if name == "ground_truth_answer":
+            if not val.startswith("```"):
+                val = "```cpp\n" + val + "\n```"
         if name == "response":
             parse_and_render_text(val)
         else:
