@@ -31,14 +31,19 @@ DATA_INFO = [
     "codeforces_submission_id",
     "programming_language",
     "total_tokens",
+    "ACC",
+    "level",
 ]
 # df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
 st.set_page_config(layout="wide")
 
 @st.cache_data
-def read_file(file_path: str) -> pl.DataFrame:
-    return pl.read_json(file_path)
+def read_file(file_path: str, file_type: str) -> pl.DataFrame:
+    if file_type == "text/json":
+        return pl.read_json(file_path)
+    elif file_type == "text/csv":
+        return pl.read_csv(file_path)
 
 def clean_text(text: str) -> str:
     text = text.replace("\\n", "\n")
@@ -123,9 +128,9 @@ def next_evaluation():
 
 current_index = st.session_state.get("current_index", 0)
 
-evaluations_file = st.file_uploader("Upload evaluations file", type="json")
+evaluations_file = st.file_uploader("Upload evaluations file", type=["json", "csv"])
 if evaluations_file:
-    df = read_file(evaluations_file)
+    df = read_file(evaluations_file, evaluations_file.type)
 
     with st.sidebar:
         st.subheader("Navigation")
@@ -150,7 +155,10 @@ if evaluations_file:
 
     # Data info
     st.header("Data Info", anchor="Data Info")
-    data_info = {key: curr_df.get_column(key).item() for key in DATA_INFO}
+    data_info = {}
+    for key in DATA_INFO:
+        if key in curr_df.columns:
+            data_info[key] = curr_df.get_column(key).item()
     st.table(data_info)
 
     # Remarks
