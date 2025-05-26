@@ -637,6 +637,7 @@ dependencies = [
     { name = "polars" },
     { name = "python-dotenv" },
     { name = "streamlit" },
+    { name = "streamlit-scroll-navigation" },
     { name = "streamlit-shortcuts" },
 ]
 
@@ -645,6 +646,7 @@ requires-dist = [
     { name = "polars", specifier = ">=1.30.0" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "streamlit", specifier = ">=1.45.1" },
+    { name = "streamlit-scroll-navigation", specifier = ">=1.2.1" },
     { name = "streamlit-shortcuts", specifier = ">=0.2.1" },
 ]
 
@@ -792,6 +794,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f0/46/9b3f73886f82d27849ce1e7a74ae7c39f5323e46da0b6e8847ad4c25f44c/streamlit-1.45.1.tar.gz", hash = "sha256:e37d56c0af5240dbc240976880e81366689c290a559376417246f9b3f51b4217", size = 9463953, upload-time = "2025-05-12T20:40:30.562Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/13/e6/69fcbae3dd2fcb2f54283a7cbe03c8b944b79997f1b526984f91d4796a02/streamlit-1.45.1-py3-none-any.whl", hash = "sha256:9ab6951585e9444672dd650850f81767b01bba5d87c8dac9bc2e1c859d6cc254", size = 9856294, upload-time = "2025-05-12T20:40:27.875Z" },
+]
+
+[[package]]
+name = "streamlit-scroll-navigation"
+version = "1.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "streamlit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/48/ca3ea73c5f38f0b1635f4d5a703d4f6cb8d5cfb866c2f367d451f59cec34/streamlit_scroll_navigation-1.2.1.tar.gz", hash = "sha256:cc23f797dffc2382021eeba444bc18ee07b3cda0330c7ba264fa4ffab5d156f1", size = 954342, upload-time = "2024-11-19T21:27:10.295Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/f2/c68b4ea05e63bce57112938499c37a45bac007b7d7978cd66f1ef6a44ac5/streamlit_scroll_navigation-1.2.1-py3-none-any.whl", hash = "sha256:e91657c3ec6b850a381ed982bd39a8e536e5e5e662db2f101aff60cc98fa6c87", size = 956223, upload-time = "2024-11-19T21:27:08.377Z" },
 ]
 
 [[package]]

@@ -8,5 +8,6 @@ dependencies = [
     "polars>=1.30.0",
     "python-dotenv>=1.1.0",
     "streamlit>=1.45.1",
+    "streamlit-scroll-navigation>=1.2.1",
     "streamlit-shortcuts>=0.2.1",
 ]

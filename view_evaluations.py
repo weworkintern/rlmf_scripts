@@ -4,6 +4,7 @@ import os
 import json
 from streamlit_shortcuts import button
 from dotenv import load_dotenv
+from streamlit_scroll_navigation import scroll_navbar
 
 load_dotenv(override=True)
 DATA_DIR = os.getenv("DATA_DIR", "./data")
@@ -31,10 +32,7 @@ DATA_INFO = [
     "programming_language",
     "total_tokens",
 ]
-
-print(os.path.join(DATA_DIR, "evaluations.json"))
 # df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
-
 
 st.set_page_config(layout="wide")
 
@@ -129,6 +127,16 @@ evaluations_file = st.file_uploader("Upload evaluations file", type="json")
 if evaluations_file:
     df = read_file(evaluations_file)
 
+    with st.sidebar:
+        st.subheader("Navigation")
+        scroll_navbar(
+            anchor_ids=[
+                "Data Info",
+                "Remarks",
+                *DATA_VALS.values()
+            ]
+        )
+
     # Buttons to control current index
     col1, col2 = st.columns(2)
     with col1:
@@ -141,12 +149,12 @@ if evaluations_file:
     curr_df = df.slice(current_index, 1)
 
     # Data info
-    st.header("Data Info")
+    st.header("Data Info", anchor="Data Info")
     data_info = {key: curr_df.get_column(key).item() for key in DATA_INFO}
     st.table(data_info)
 
     # Remarks
-    st.header("Remarks")
+    st.header("Remarks", anchor="Remarks")
     remarks = curr_df.get_column("remarks").item()
     remarks = remarks.replace("'", '"')
     st.table((json.loads(remarks)["remarks"]))
@@ -155,11 +163,10 @@ if evaluations_file:
 
     for (name, title) in DATA_VALS.items():
         val = curr_df.get_column(name).item()
+        st.header(title, anchor=title)
         if not val:
-            st.header(title)
             st.write("No value")
             continue
-        st.header(title)
         val = clean_text(val)
         if name == "response":
             parse_and_render_text(val)
