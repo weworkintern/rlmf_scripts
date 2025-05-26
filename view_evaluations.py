@@ -36,7 +36,7 @@ DATA_INFO = [
 ]
 # df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="CoT Viewer", page_icon="👀")
 
 @st.cache_data
 def read_file(file_path: str, file_type: str) -> pl.DataFrame:
