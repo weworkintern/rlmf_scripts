@@ -40,7 +40,7 @@ st.set_page_config(layout="wide", page_title="CoT Viewer", page_icon="👀")
 
 @st.cache_data
 def read_file(file_path: str, file_type: str) -> pl.DataFrame:
-    if file_type == "text/json":
+    if file_type == "application/json":
         return pl.read_json(file_path)
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
