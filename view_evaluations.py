@@ -21,6 +21,7 @@ DATA_VALS = {
 
 DATA_INFO = [
     "task id",
+    "trainer id",
     "model name",
     "abandon_prompt",
     "abandon_prompt_reason",
