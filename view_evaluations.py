@@ -36,6 +36,31 @@ DATA_INFO = [
     "ACC",
     "level",
 ]
+
+SCROLLBAR_STYLES = {
+    "navbarButtonBase": {
+        "backgroundColor": "#f4f3ed",
+        "color": "#222",
+        "borderColor": "#d3d2ca"
+    },
+    "navbarButtonActive": {
+        "backgroundColor": "#bb5a38",
+        "color": "#fff",
+        "borderColor": "#bb5a38"
+    },
+    "navbarButtonHover": {
+        "backgroundColor": "#ecebe3",
+        "secondaryBackgroundColor": "#ecebe3",
+        "color": "#222",
+        "linkColor": "#222",
+        "borderColor": "#bb5a38"
+    },
+    "navigationBarBase": {
+        "backgroundColor": "#f4f3ed",
+        "color": "#222",
+        "borderColor": "#d3d2ca"
+    }
+}
 # df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
 st.set_page_config(layout="wide", page_title="CoT Viewer", page_icon="👀")
@@ -47,40 +72,41 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
 
-def display_example(input_text: str, output_text: str) -> None:
-    """Display an example input/output pair in a Streamlit table."""
-    st.table({
-        "Input": [input_text],
-        "Output": [output_text]
-    })
+def format_examples(text):
+    def replacement(match):
+        input_text = match.group(1)
+        output_text = match.group(2)
+        return f"\n---\n\n```\n{input_text}\n```\n\n```\n{output_text}\n```"
+    
+    # Replace each example in-place
+    return re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", replacement, text, flags=re.DOTALL)
 
-def clean_text(text: str) -> str:
+def clean_text(text: str, category: str) -> str:
     text = text.replace("\\\\(", "$")
     text = text.replace("\\\\)", "$")
-    text = text.replace("\\\\[", "$\n")
-    text = text.replace("\\\\]", "$\n")
+    text = text.replace("\\\\[", "$")
+    text = text.replace("\\\\]", "$")
     text = text.replace("\\InputFile", "")
     text = text.replace("\\OutputFile", "")
     text = text.replace("\\Note", "")
     
     # Find all examples and display them as tables
-    examples = re.findall(r"\\exmp\{(.*?)\}\{(.*?)\}%", text)
-    if examples:
-        st.write("### Examples")
-    for input_text, output_text in examples:
-        display_example(
-            input_text.replace('\\n', '\n'),
-            output_text.replace('\\n', '\n')
-        )
+    text = format_examples(text)
     
     # Remove the example markers from the text
     text = re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", "", text)
     text = re.sub(r"\\begin\{problem\}.*?megabytes\}", "", text)
     text = re.sub(r"\\begin\{center\}.*\\includegraphics.*?\\end\{center\}", "*(A graphic is shown here in the original problem.)*", text)
     text = re.sub(r"\\end\{problem\}", "", text)
+    text = re.sub(r"\\textit\{(.*?)\}", r"*\1*", text)
+    text = re.sub(r"\\textbf\{(.*?)\}", r"**\1**", text)
 
-    text = text.replace("\\n", "\n")
-    text = re.sub(r"\\t(!imes)", r"\t\1", text)
+    if category != "response":
+        text = re.sub(r"\\n(?!e )", "\n", text)
+    else:
+        text = re.sub(r"\\n\\n", "\n", text)
+        text = re.sub(r"\\n(?!e )(?!\\n)", "  \n", text)
+    text = re.sub(r"\\t(?!imes)", r"\t", text)
     text = text.replace("\\begin{example}", "")
     text = text.replace("\\end{example}", "")
     return text
@@ -125,7 +151,7 @@ def parse_and_render_text(text: str) -> None:
         
         # Display text before the token
         if start_pos > 0:
-            st.markdown(remaining_text[:start_pos], unsafe_allow_html=True)
+            st.write(remaining_text[:start_pos], unsafe_allow_html=True)
         
         # Find the end of this token section
         token_start = start_pos + len(f"<{current_token}>")
@@ -134,11 +160,13 @@ def parse_and_render_text(text: str) -> None:
         
         if end_pos == -1:  # No closing tag found
             # Display the token name and rest of text
+            st.subheader("", anchor=f"Round {token_count[current_token]}")
             tokens[current_token](f"**{current_token.upper()} {token_count[current_token]}:** {remaining_text[token_start:]}")
             token_count[current_token] += 1
             remaining_text = ""
         else:
             # Display the content with the appropriate component
+            st.subheader("", anchor=f"Round {token_count[current_token]}")
             token_content = remaining_text[token_start:end_pos]
             tokens[current_token](f"**{current_token.upper()} {token_count[current_token]}:** {token_content}")
             token_count[current_token] += 1
@@ -147,7 +175,7 @@ def parse_and_render_text(text: str) -> None:
     
     # Display any remaining text
     if remaining_text:
-        st.markdown(remaining_text, unsafe_allow_html=True)
+        st.write(remaining_text, unsafe_allow_html=True)
 
 if "button_key_counter" not in st.session_state:
     st.session_state["button_key_counter"] = 0
@@ -167,50 +195,37 @@ evaluations_file = st.file_uploader("Upload evaluations file", type=["json", "cs
 if evaluations_file:
     df = read_file(evaluations_file, evaluations_file.type)
 
+    curr_df = df.slice(current_index, 1)
+
     with st.sidebar:
+        # Buttons to control current index
+        col1, col2 = st.columns(2)
+        with col1:
+            button("Previous", "ArrowLeft", previous_evaluation, use_container_width=True)
+        with col2:
+            button("Next", "ArrowRight", next_evaluation, use_container_width=True)
+        search = st.text_input("Search by task ID", key="search", on_change=search_evaluation)
         st.subheader("Navigation")
         scroll_navbar(
+            key="main",
             anchor_ids=[
                 "Data Info",
                 "Remarks",
-                *DATA_VALS.values()
+                *DATA_VALS.values(),
+                "Raw Data"
             ],
-            override_styles={
-                "navbarButtonBase": {
-                    "backgroundColor": "#f4f3ed",
-                    "color": "#222",
-                    "borderColor": "#d3d2ca"
-                },
-                "navbarButtonActive": {
-                    "backgroundColor": "#bb5a38",
-                    "color": "#fff",
-                    "borderColor": "#bb5a38"
-                },
-                "navbarButtonHover": {
-                    "backgroundColor": "#ecebe3",
-                    "secondaryBackgroundColor": "#ecebe3",
-                    "color": "#222",
-                    "linkColor": "#222",
-                    "borderColor": "#bb5a38"
-                },
-                "navigationBarBase": {
-                    "backgroundColor": "#f4f3ed",
-                    "color": "#222",
-                    "borderColor": "#d3d2ca"
-                }
-            }
+            override_styles=SCROLLBAR_STYLES
         )
-
-    # Buttons to control current index
-    col1, col2 = st.columns(2)
-    with col1:
-        button("Previous", "ArrowLeft", previous_evaluation, use_container_width=True)
-    with col2:
-        button("Next", "ArrowRight", next_evaluation, use_container_width=True)
-
-    search = st.text_input("Search by task ID", key="search", on_change=search_evaluation)
-
-    curr_df = df.slice(current_index, 1)
+        if curr_df.get_column("intervention rounds").item() > 0:
+            st.subheader("Intervention Rounds")
+            scroll_navbar(
+                key="intervention_rounds",
+                anchor_ids=list(map(lambda x: f"Round {x}", range(1, curr_df["intervention rounds"].item() + 1))),
+                override_styles=SCROLLBAR_STYLES
+            )
+    
+    st.header("Instructions")
+    st.info("Use the navigation bar to quickly jump to the prompts, responses and interventions.  \nYou can search by task ID, and use the arrow keys to switch between cases.")
 
     # Data info
     st.header("Data Info", anchor="Data Info")
@@ -234,8 +249,8 @@ if evaluations_file:
         if not val:
             st.write("No value")
             continue
-        val = clean_text(val)
-        if name != "final_answer":
+        val = clean_text(val, name)
+        if name != "final_answer" and name != "ground_truth_answer":
             val = val.replace("\n", "\n\n")
         if name == "ground_truth_answer":
             if not val.startswith("```"):
@@ -243,9 +258,12 @@ if evaluations_file:
         if name == "response":
             parse_and_render_text(val)
         else:
-            st.markdown(val, unsafe_allow_html=True)
+            st.write(val, unsafe_allow_html=True)
         st.divider()
 
-    st.dataframe(curr_df)
+    st.header("Raw Data", anchor="Raw Data")
+    st.dataframe(curr_df.unpivot(), height=800)
 else:
     st.info("Upload an evaluation file to view")
+
+st.html("<style>[data-testid='stHeaderActionElements'] {display: none;}</style>")
