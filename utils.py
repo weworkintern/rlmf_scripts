@@ -68,7 +68,7 @@ def convert_latex_to_lists(text):
     list_stack = []  # Stack to track if current level is enumerate or itemize
     
     # Dictionary to track count at each level (for enumerate only)
-    counters = {}
+    counters = defaultdict(int)
     
     # Process the text line by line
     lines = text.split('\n')
@@ -80,8 +80,8 @@ def convert_latex_to_lists(text):
         original_line = lines[i]  # Keep original line with whitespace
         
         # Check for begin enumerate or itemize
-        if re.match(r'\\begin\{(enumerate|itemize)\}', line):
-            match = re.match(r'\\begin\{(enumerate|itemize)\}', line)
+        if re.match(r'\\begin\s?\{(enumerate|itemize)\}', line):
+            match = re.match(r'\\begin\s?\{(enumerate|itemize)\}', line)
             list_type = match.group(1)
             
             level += 1
@@ -96,7 +96,7 @@ def convert_latex_to_lists(text):
             continue
             
         # Check for end enumerate or itemize
-        elif re.match(r'\\end\{(enumerate|itemize)\}', line):
+        elif re.match(r'\\end\s?\{(enumerate|itemize)\}', line):
             # Reset counter for this level if it was enumerate
             if list_stack and list_stack[-1] == 'enumerate':
                 counters[level] = 0
@@ -189,6 +189,10 @@ def clean_text(text: str, category: str) -> str:
     text = re.sub(r"\\textit\{(.*?)\}", r"*\1*", text)
     text = re.sub(r"\\textbf\{(.*?)\}", r"**\1**", text)
     text = re.sub(r"\\emph\{(.*?)\}", r"*\1*", text)
+    text = re.sub(r"\\it\{(.*?)\}", r"*\1*", text)
+
+    # Fixes href tags
+    text = re.sub(r"\\href\{(.*?)\}\{(.*?)\}", r"[\2](\1)", text)
     
     # Fixes \texttt
     text = re.sub(r"[`']*\\t(exttt)?\{(.*?)\}[`']*", r"`\2`", text)
@@ -197,9 +201,9 @@ def clean_text(text: str, category: str) -> str:
         text = re.sub(r"\\n(?!e )(?!eq )", "\n", text)
     else:
         text = re.sub(r"\\n\\n", "\n", text)
-        text = re.sub(r"\\n(?!e )(?!\\n)", "  \n", text)
+        text = re.sub(r"\\n(?!e )(?!eq )(?!\\n)(?!ot )", "  \n", text)
     
-    text = re.sub(r"\\t(?!imes)(?!ext)", r"\t", text)
+    text = re.sub(r"\\t(?!imes)(?!ext)(?!o)(?!au)(?!heta)", r"\t", text)
     text = text.replace("\\begin{example}", "")
     text = text.replace("\\end{example}", "")
     text = convert_latex_to_lists(text)

@@ -6,6 +6,7 @@ from streamlit_shortcuts import button
 from dotenv import load_dotenv
 from streamlit_scroll_navigation import scroll_navbar
 from utils import parse_and_render_text, clean_text
+import ast
 
 load_dotenv(override=True)
 DATA_DIR = os.getenv("DATA_DIR", "./data")
@@ -177,8 +178,8 @@ if evaluations_file:
     # Remarks
     st.header("Remarks", anchor="Remarks")
     remarks = curr_df.get_column("remarks").item()
-    remarks = remarks.replace("'", '"')
-    st.table((json.loads(remarks)["remarks"]))
+    remarks_dict = ast.literal_eval(remarks)
+    st.table(remarks_dict["remarks"])
 
     for (name, title) in DATA_VALS.items():
         val = curr_df.get_column(name).item()
