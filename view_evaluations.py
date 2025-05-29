@@ -72,11 +72,11 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
 
-def format_examples(text):
+def format_examples(text, add_flag=False):
     def replacement(match):
         input_text = match.group(1)
         output_text = match.group(2)
-        return f"\n---\n\n```\n{input_text}\n```\n\n```\n{output_text}\n```"
+        return f"\n\n```\n{input_text}\n```\n\n```\n{output_text}\n```\n{'---' if add_flag else ''}"
     
     # Replace each example in-place
     return re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", replacement, text, flags=re.DOTALL)
@@ -91,7 +91,7 @@ def clean_text(text: str, category: str) -> str:
     text = text.replace("\\Note", "")
     
     # Find all examples and display them as tables
-    text = format_examples(text)
+    text = format_examples(text, add_flag=category != "response")
     
     # Remove the example markers from the text
     text = re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", "", text)
@@ -100,6 +100,8 @@ def clean_text(text: str, category: str) -> str:
     text = re.sub(r"\\end\{problem\}", "", text)
     text = re.sub(r"\\textit\{(.*?)\}", r"*\1*", text)
     text = re.sub(r"\\textbf\{(.*?)\}", r"**\1**", text)
+    text = re.sub(r"\\emph\{(.*?)\}", r"*\1*", text)
+    text = re.sub(r"[`']\\t\{(.*?)\}'", r"`\1`", text)
 
     if category != "response":
         text = re.sub(r"\\n(?!e )", "\n", text)
