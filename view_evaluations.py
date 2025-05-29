@@ -5,7 +5,7 @@ import json
 from streamlit_shortcuts import button
 from dotenv import load_dotenv
 from streamlit_scroll_navigation import scroll_navbar
-import re
+from utils import parse_and_render_text, clean_text
 
 load_dotenv(override=True)
 DATA_DIR = os.getenv("DATA_DIR", "./data")
@@ -72,46 +72,11 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
 
-def format_examples(text, add_flag=False):
-    def replacement(match):
-        input_text = match.group(1)
-        output_text = match.group(2)
-        return f"\n\n```\n{input_text}\n```\n\n```\n{output_text}\n```\n{'---' if add_flag else ''}"
-    
-    # Replace each example in-place
-    return re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", replacement, text, flags=re.DOTALL)
+if "button_key_counter" not in st.session_state:
+    st.session_state["button_key_counter"] = 0
 
-def clean_text(text: str, category: str) -> str:
-    text = text.replace("\\\\(", "$")
-    text = text.replace("\\\\)", "$")
-    text = text.replace("\\\\[", "$")
-    text = text.replace("\\\\]", "$")
-    text = text.replace("\\InputFile", "")
-    text = text.replace("\\OutputFile", "")
-    text = text.replace("\\Note", "")
-    
-    # Find all examples and display them as tables
-    text = format_examples(text, add_flag=category != "response")
-    
-    # Remove the example markers from the text
-    text = re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", "", text)
-    text = re.sub(r"\\begin\{problem\}.*?megabytes\}", "", text)
-    text = re.sub(r"\\begin\{center\}.*\\includegraphics.*?\\end\{center\}", "*(A graphic is shown here in the original problem.)*", text)
-    text = re.sub(r"\\end\{problem\}", "", text)
-    text = re.sub(r"\\textit\{(.*?)\}", r"*\1*", text)
-    text = re.sub(r"\\textbf\{(.*?)\}", r"**\1**", text)
-    text = re.sub(r"\\emph\{(.*?)\}", r"*\1*", text)
-    text = re.sub(r"[`']\\t\{(.*?)\}'", r"`\1`", text)
-
-    if category != "response":
-        text = re.sub(r"\\n(?!e )", "\n", text)
-    else:
-        text = re.sub(r"\\n\\n", "\n", text)
-        text = re.sub(r"\\n(?!e )(?!\\n)", "  \n", text)
-    text = re.sub(r"\\t(?!imes)", r"\t", text)
-    text = text.replace("\\begin{example}", "")
-    text = text.replace("\\end{example}", "")
-    return text
+if "current_index" not in st.session_state:
+    st.session_state["current_index"] = 0
 
 def search_evaluation():
     """Search for a task ID and update the current index."""
@@ -128,68 +93,19 @@ def search_evaluation():
         print(f"Match index: {match_index}")
         st.session_state["current_index"] = match_index
 
-def parse_and_render_text(text: str) -> None:
-    """Split text by token tags and render each chunk with appropriate Streamlit component."""
-    tokens = {
-        "abandon": st.error,
-        "reason": st.info,
-        "intervene": st.warning
-    }
-    token_count = {token: 1 for token in tokens}
-    
-    # Process the text to find and display chunks
-    remaining_text = text
-    while any(f"<{token}>" in remaining_text for token in tokens):
-        # Find the first occurrence of any token
-        token_positions = {token: remaining_text.find(f"<{token}>") for token in tokens}
-        token_positions = {token: pos for token, pos in token_positions.items() if pos != -1}
-        
-        if not token_positions:
-            break
-            
-        # Find which token comes first
-        current_token = min(token_positions, key=token_positions.get)
-        start_pos = token_positions[current_token]
-        
-        # Display text before the token
-        if start_pos > 0:
-            st.write(remaining_text[:start_pos], unsafe_allow_html=True)
-        
-        # Find the end of this token section
-        token_start = start_pos + len(f"<{current_token}>")
-        end_tag = f"</{current_token}>"
-        end_pos = remaining_text.find(end_tag, token_start)
-        
-        if end_pos == -1:  # No closing tag found
-            # Display the token name and rest of text
-            st.subheader("", anchor=f"Round {token_count[current_token]}")
-            tokens[current_token](f"**{current_token.upper()} {token_count[current_token]}:** {remaining_text[token_start:]}")
-            token_count[current_token] += 1
-            remaining_text = ""
-        else:
-            # Display the content with the appropriate component
-            st.subheader("", anchor=f"Round {token_count[current_token]}")
-            token_content = remaining_text[token_start:end_pos]
-            tokens[current_token](f"**{current_token.upper()} {token_count[current_token]}:** {token_content}")
-            token_count[current_token] += 1
-            # Update remaining text
-            remaining_text = remaining_text[end_pos + len(end_tag):]
-    
-    # Display any remaining text
-    if remaining_text:
-        st.write(remaining_text, unsafe_allow_html=True)
-
-if "button_key_counter" not in st.session_state:
-    st.session_state["button_key_counter"] = 0
-
-if "current_index" not in st.session_state:
-    st.session_state["current_index"] = 0
-
 def previous_evaluation():
-    st.session_state["current_index"] -= 1
+    if st.session_state["current_index"] > 0:
+        st.session_state["current_index"] -= 1
+    else:
+        st.session_state["current_index"] = len(df) - 1
+    st.session_state["search"] = str(df.slice(st.session_state["current_index"], 1).get_column("task id").item())
 
 def next_evaluation():
-    st.session_state["current_index"] += 1
+    if st.session_state["current_index"] < len(df) - 1:
+        st.session_state["current_index"] += 1
+    else:
+        st.session_state["current_index"] = 0
+    st.session_state["search"] = str(df.slice(st.session_state["current_index"], 1).get_column("task id").item())
 
 current_index = st.session_state.get("current_index", 0)
 
@@ -231,6 +147,27 @@ if evaluations_file:
 
     # Data info
     st.header("Data Info", anchor="Data Info")
+    st.subheader("All Cases")
+    stats = pl.DataFrame({
+        "total": len(df),
+        "abandoned": df.filter(pl.col("abandon_prompt") == "Yes").shape[0],
+        "zero_interventions": df.filter(pl.col("intervention rounds") == 0).shape[0],
+        "effective": len(df) - df.filter(pl.col("abandon_prompt_reason").is_not_null()).shape[0] - df.filter(pl.col("intervention rounds") == 0).shape[0],
+        "abandoned_and_no_interventions": df.filter((pl.col("abandon_prompt") == "Yes") & (pl.col("intervention rounds") == 0)).shape[0],
+    })
+    
+    if stats["abandoned_and_no_interventions"].item() > 0:
+        st.error(f"Sanity check failed: There are {stats['abandoned_and_no_interventions'].item()} cases where the case was abandoned and no interventions were made.")
+    
+    calcs = pl.DataFrame({
+        "correlation": df.filter(pl.col("ACC").is_not_null()).select(pl.corr(pl.col("intervention rounds"), pl.col("ACC"), method="pearson")).item(),
+        "correlation w/o ACC = 0": df.filter((pl.col("ACC").cast(pl.Float64, strict=False).is_not_null()) & (pl.col("ACC").cast(pl.Float64, strict=False) > 0)).select(pl.corr(pl.col("intervention rounds"), pl.col("ACC"), method="pearson")).item(),
+    })
+
+    st.table(stats.unpivot(variable_name="category", value_name="count"))
+    st.table(calcs.unpivot(variable_name="stat", value_name="value"))
+
+    st.subheader("Current Case")
     data_info = {}
     for key in DATA_INFO:
         if key in curr_df.columns:
@@ -242,8 +179,6 @@ if evaluations_file:
     remarks = curr_df.get_column("remarks").item()
     remarks = remarks.replace("'", '"')
     st.table((json.loads(remarks)["remarks"]))
-
-    st.divider()
 
     for (name, title) in DATA_VALS.items():
         val = curr_df.get_column(name).item()
