@@ -178,11 +178,26 @@ if evaluations_file:
             override_styles={
                 "navbarButtonBase": {
                     "backgroundColor": "#f4f3ed",
+                    "color": "#222",
+                    "borderColor": "#d3d2ca"
+                },
+                "navbarButtonActive": {
+                    "backgroundColor": "#bb5a38",
+                    "color": "#fff",
+                    "borderColor": "#bb5a38"
+                },
+                "navbarButtonHover": {
+                    "backgroundColor": "#ecebe3",
                     "secondaryBackgroundColor": "#ecebe3",
                     "color": "#222",
                     "linkColor": "#222",
-                    "borderColor": "#222"
+                    "borderColor": "#bb5a38"
                 },
+                "navigationBarBase": {
+                    "backgroundColor": "#f4f3ed",
+                    "color": "#222",
+                    "borderColor": "#d3d2ca"
+                }
             }
         )
 
@@ -220,7 +235,7 @@ if evaluations_file:
             st.write("No value")
             continue
         val = clean_text(val)
-        if name != "final_answer" and name != "ground_truth_answer":
+        if name != "final_answer":
             val = val.replace("\n", "\n\n")
         if name == "ground_truth_answer":
             if not val.startswith("```"):
