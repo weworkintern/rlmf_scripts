@@ -5,6 +5,7 @@ import json
 from streamlit_shortcuts import button
 from dotenv import load_dotenv
 from streamlit_scroll_navigation import scroll_navbar
+import re
 
 load_dotenv(override=True)
 DATA_DIR = os.getenv("DATA_DIR", "./data")
@@ -46,9 +47,42 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
 
+def display_example(input_text: str, output_text: str) -> None:
+    """Display an example input/output pair in a Streamlit table."""
+    st.table({
+        "Input": [input_text],
+        "Output": [output_text]
+    })
+
 def clean_text(text: str) -> str:
+    text = text.replace("\\\\(", "$")
+    text = text.replace("\\\\)", "$")
+    text = text.replace("\\\\[", "$\n")
+    text = text.replace("\\\\]", "$\n")
+    text = text.replace("\\InputFile", "")
+    text = text.replace("\\OutputFile", "")
+    text = text.replace("\\Note", "")
+    
+    # Find all examples and display them as tables
+    examples = re.findall(r"\\exmp\{(.*?)\}\{(.*?)\}%", text)
+    if examples:
+        st.write("### Examples")
+    for input_text, output_text in examples:
+        display_example(
+            input_text.replace('\\n', '\n'),
+            output_text.replace('\\n', '\n')
+        )
+    
+    # Remove the example markers from the text
+    text = re.sub(r"\\exmp\{(.*?)\}\{(.*?)\}%", "", text)
+    text = re.sub(r"\\begin\{problem\}.*?megabytes\}", "", text)
+    text = re.sub(r"\\begin\{center\}.*\\includegraphics.*?\\end\{center\}", "*(A graphic is shown here in the original problem.)*", text)
+    text = re.sub(r"\\end\{problem\}", "", text)
+
     text = text.replace("\\n", "\n")
-    text = text.replace("\\\\", "$")
+    text = re.sub(r"\\t(!imes)", r"\t\1", text)
+    text = text.replace("\\begin{example}", "")
+    text = text.replace("\\end{example}", "")
     return text
 
 def search_evaluation():
@@ -91,7 +125,7 @@ def parse_and_render_text(text: str) -> None:
         
         # Display text before the token
         if start_pos > 0:
-            st.markdown(remaining_text[:start_pos])
+            st.markdown(remaining_text[:start_pos], unsafe_allow_html=True)
         
         # Find the end of this token section
         token_start = start_pos + len(f"<{current_token}>")
@@ -140,7 +174,16 @@ if evaluations_file:
                 "Data Info",
                 "Remarks",
                 *DATA_VALS.values()
-            ]
+            ],
+            override_styles={
+                "navbarButtonBase": {
+                    "backgroundColor": "#f4f3ed",
+                    "secondaryBackgroundColor": "#ecebe3",
+                    "color": "#222",
+                    "linkColor": "#222",
+                    "borderColor": "#222"
+                },
+            }
         )
 
     # Buttons to control current index
@@ -177,13 +220,15 @@ if evaluations_file:
             st.write("No value")
             continue
         val = clean_text(val)
+        if name != "final_answer" and name != "ground_truth_answer":
+            val = val.replace("\n", "\n\n")
         if name == "ground_truth_answer":
             if not val.startswith("```"):
                 val = "```cpp\n" + val + "\n```"
         if name == "response":
             parse_and_render_text(val)
         else:
-            st.markdown(val)
+            st.markdown(val, unsafe_allow_html=True)
         st.divider()
 
     st.dataframe(curr_df)
