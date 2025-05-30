@@ -26,6 +26,11 @@ DATA_INFO = [
     "level",
 ]
 
+FILTER_OPTIONS = [
+    "Abandoned",
+    "Has interventions",
+]
+
 SCROLLBAR_STYLES = {
     "navbarButtonBase": {
         "backgroundColor": "#f4f3ed",
