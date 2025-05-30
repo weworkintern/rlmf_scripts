@@ -1,67 +1,16 @@
 import streamlit as st
 import polars as pl
+import ast
 import os
-import json
 from streamlit_shortcuts import button
 from dotenv import load_dotenv
 from streamlit_scroll_navigation import scroll_navbar
 from utils import parse_and_render_text, clean_text
-import ast
+from constants import DATA_VALS, DATA_INFO, SCROLLBAR_STYLES
 
 load_dotenv(override=True)
 DATA_DIR = os.getenv("DATA_DIR", "./data")
 
-DATA_VALS = {
-    "user prompt": "User Prompt",
-    "response": "Response",
-    "system prompt": "System Prompt",
-    "intervene_system_prompt": "Intervene System Prompt",
-    "intervene prompt": "Intervene User Prompt",
-    "final_answer": "Final Answer",
-    "ground_truth_answer": "Ground Truth Answer",
-}
-
-DATA_INFO = [
-    "task id",
-    "trainer id",
-    "model name",
-    "abandon_prompt",
-    "abandon_prompt_reason",
-    "temperature",
-    "intervention rounds",
-    "CoT quality",
-    "Model performance classification",
-    "codeforces_submission_id",
-    "programming_language",
-    "total_tokens",
-    "ACC",
-    "level",
-]
-
-SCROLLBAR_STYLES = {
-    "navbarButtonBase": {
-        "backgroundColor": "#f4f3ed",
-        "color": "#222",
-        "borderColor": "#d3d2ca"
-    },
-    "navbarButtonActive": {
-        "backgroundColor": "#bb5a38",
-        "color": "#fff",
-        "borderColor": "#bb5a38"
-    },
-    "navbarButtonHover": {
-        "backgroundColor": "#ecebe3",
-        "secondaryBackgroundColor": "#ecebe3",
-        "color": "#222",
-        "linkColor": "#222",
-        "borderColor": "#bb5a38"
-    },
-    "navigationBarBase": {
-        "backgroundColor": "#f4f3ed",
-        "color": "#222",
-        "borderColor": "#d3d2ca"
-    }
-}
 # df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
 st.set_page_config(layout="wide", page_title="CoT Viewer", page_icon="👀")
@@ -72,12 +21,6 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
         return pl.read_json(file_path)
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
-
-if "button_key_counter" not in st.session_state:
-    st.session_state["button_key_counter"] = 0
-
-if "current_index" not in st.session_state:
-    st.session_state["current_index"] = 0
 
 def search_evaluation():
     """Search for a task ID and update the current index."""
@@ -91,7 +34,6 @@ def search_evaluation():
     matches = task_ids.str.contains(search_term)
     if matches.any():
         match_index = matches.arg_true().item(0)  # Get the first match index
-        print(f"Match index: {match_index}")
         st.session_state["current_index"] = match_index
 
 def previous_evaluation():
@@ -108,6 +50,58 @@ def next_evaluation():
         st.session_state["current_index"] = 0
     st.session_state["search"] = str(df.slice(st.session_state["current_index"], 1).get_column("task id").item())
 
+@st.dialog("Search Results")
+def search_for_string():
+    search_term = st.session_state.get("search_string", "")
+    if not search_term:
+        return
+    
+    df = st.session_state["df"]
+
+    matches = df.filter(pl.col("user prompt").str.contains_any([search_term], ascii_case_insensitive=True) | pl.col("response").str.contains_any([search_term], ascii_case_insensitive=True))
+    if matches.shape[0] > 0:
+        st.write(f"There are {matches.shape[0]} matches for '{search_term}'")
+        for i in range(matches.shape[0]):
+            task_id = matches.get_column('task id').item(i)
+            prompt_item = matches.get_column('user prompt').item(i)
+            response_item = matches.get_column('response').item(i)
+
+            if st.button(f"Task {task_id}"):
+                st.session_state["search"] = str(task_id)
+                search_evaluation()
+                st.rerun()
+
+            if search_term.lower() in prompt_item.lower():
+                idx = prompt_item.lower().index(search_term.lower())
+                prefix = "**Prompt:** "
+                if idx > 50 and len(prompt_item) - idx > 50:
+                    st.write(f"{prefix}...{prompt_item[idx-50:idx+50]}...")
+                elif idx <= 50:
+                    st.write(f"{prefix}{prompt_item[:100]}...")
+                else:
+                    st.write(f"{prefix}...{prompt_item[-100:]}")
+            if search_term.lower() in response_item.lower():
+                idx = response_item.lower().index(search_term.lower())
+                prefix = "**Response:** "
+                if idx > 50 and len(response_item) - idx > 50:
+                    st.write(f"{prefix}...{response_item[idx-50:idx+50]}...")
+                elif idx <= 50:
+                    st.write(f"{prefix}{response_item[:100]}...")
+                else:
+                    st.write(f"{prefix}...{response_item[-100:]}")
+            st.divider()
+    else:
+        st.write(f"No matches found for '{search_term}'")
+
+if "button_key_counter" not in st.session_state:
+    st.session_state["button_key_counter"] = 0
+
+if "current_index" not in st.session_state:
+    st.session_state["current_index"] = 0
+
+if "search_string" not in st.session_state:
+    st.session_state["search_string"] = ""
+
 current_index = st.session_state.get("current_index", 0)
 
 evaluations_file = st.file_uploader("Upload evaluations file", type=["json", "csv"])
@@ -116,6 +110,9 @@ if evaluations_file:
 
     curr_df = df.slice(current_index, 1)
 
+    st.session_state["df"] = df
+    st.session_state["curr_df"] = curr_df
+
     with st.sidebar:
         # Buttons to control current index
         col1, col2 = st.columns(2)
@@ -123,7 +120,12 @@ if evaluations_file:
             button("Previous", "ArrowLeft", previous_evaluation, use_container_width=True)
         with col2:
             button("Next", "ArrowRight", next_evaluation, use_container_width=True)
-        search = st.text_input("Search by task ID", key="search", on_change=search_evaluation)
+
+        search = st.text_input("Search by task ID", key="search", on_change=search_evaluation, placeholder="e.g. 60000")
+        
+        if "search" in st.session_state:
+            st.text_input("Search in prompt and response", key="search_string", on_change=search_for_string)
+
         st.subheader("Navigation")
         scroll_navbar(
             key="main",
@@ -208,4 +210,5 @@ if evaluations_file:
 else:
     st.info("Upload an evaluation file to view")
 
+# Hide all anchor icons
 st.html("<style>[data-testid='stHeaderActionElements'] {display: none;}</style>")
