@@ -160,13 +160,17 @@ if evaluations_file:
     if stats["abandoned_and_no_interventions"].item() > 0:
         st.error(f"Sanity check failed: There are {stats['abandoned_and_no_interventions'].item()} cases where the case was abandoned and no interventions were made.")
     
-    calcs = pl.DataFrame({
-        "correlation": df.filter(pl.col("ACC").is_not_null()).select(pl.corr(pl.col("intervention rounds"), pl.col("ACC"), method="pearson")).item(),
-        "correlation w/o ACC = 0": df.filter((pl.col("ACC").cast(pl.Float64, strict=False).is_not_null()) & (pl.col("ACC").cast(pl.Float64, strict=False) > 0)).select(pl.corr(pl.col("intervention rounds"), pl.col("ACC"), method="pearson")).item(),
-    })
+    # Only calculate correlations if ACC column exists
+    calcs = {}
+    if "ACC" in df.columns:
+        calcs["correlation"] = df.filter(pl.col("ACC").is_not_null()).select(pl.corr(pl.col("intervention rounds"), pl.col("ACC"), method="pearson")).item()
+        calcs["correlation w/o ACC = 0"] = df.filter((pl.col("ACC").cast(pl.Float64, strict=False).is_not_null()) & (pl.col("ACC").cast(pl.Float64, strict=False) > 0)).select(pl.corr(pl.col("intervention rounds"), pl.col("ACC"), method="pearson")).item()
+        calcs_df = pl.DataFrame({"stat": list(calcs.keys()), "value": list(calcs.values())})
+    else:
+        calcs_df = pl.DataFrame({"stat": ["Note"], "value": ["ACC column not present in data"]})
 
     st.table(stats.unpivot(variable_name="category", value_name="count"))
-    st.table(calcs.unpivot(variable_name="stat", value_name="value"))
+    st.table(calcs_df)
 
     st.subheader("Current Case")
     data_info = {}
