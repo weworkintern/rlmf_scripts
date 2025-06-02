@@ -298,6 +298,8 @@ if evaluations_file:
     st.table(remarks_dict["remarks"])
 
     for (name, title) in DATA_VALS.items():
+        if name not in curr_df.columns:
+            continue
         val = curr_df.get_column(name).item()
         st.header(title, anchor=title)
         if not val:

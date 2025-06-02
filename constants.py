@@ -2,6 +2,7 @@ DATA_VALS = {
     "user prompt": "User Prompt",
     "response": "Response",
     "system prompt": "System Prompt",
+    "initial_response": "Initial Response",
     "intervene_system_prompt": "Intervene System Prompt",
     "intervene prompt": "Intervene User Prompt",
     "final_answer": "Final Answer",

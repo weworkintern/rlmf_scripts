@@ -161,8 +161,12 @@ def convert_latex_to_lists(text):
 
 def clean_text(text: str, category: str) -> str:
     # Turns inline and block math into katex-compatible
+    text = text.encode("utf-8").decode("unicode_escape")
+    
     text = text.replace("\\\\(", "$")
     text = text.replace("\\\\)", "$")
+    text = text.replace("\\(", "$")
+    text = text.replace("\\)", "$")
     text = text.replace("\\\\[", "$")
     text = text.replace("\\\\]", "$")
 
