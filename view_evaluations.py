@@ -41,6 +41,7 @@ def fetch_filtered_df():
     filter_choices = st.session_state.get("filter_choices", [])
     abandon_choices = st.session_state.get("abandon_choices", [])
     classification_choices = st.session_state.get("classification_choices", [])
+    trainer_choices = st.session_state.get("trainer_choices", [])
     acc_choices = st.session_state.get("acc_choices", [])
     if "Abandoned" in filter_choices:
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
@@ -52,6 +53,8 @@ def fetch_filtered_df():
         filtered_df = filtered_df.filter(pl.col("Model performance classification").is_in(classification_choices))
     if len(acc_choices) > 0:
         filtered_df = filtered_df.filter(pl.col("ACC").cast(pl.Float64, strict=False).is_in(acc_choices))
+    if len(trainer_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("trainer id").is_in(trainer_choices))
     return filtered_df
 
 def get_filtered_indices():
@@ -160,7 +163,9 @@ default_state = {
     "abandon_choices": [],
     "classification_choices": [],
     "acc_choices": [],
-    "filter_choices": []
+    "filter_choices": [],
+    "trainer_options": [],
+    "trainer_choices": []
 }
 
 for key, default_value in default_state.items():
@@ -183,10 +188,13 @@ if evaluations_file:
     acc_options = []
     if "ACC" in df.columns:
         acc_options = df.get_column("ACC").cast(pl.Float64, strict=False).unique().to_list()
+    if "trainer id" in df.columns:
+        trainer_options = df.get_column("trainer id").unique().to_list()
 
     st.session_state["abandon_options"] = abandon_options
     st.session_state["classification_options"] = classification_options
     st.session_state["acc_options"] = acc_options
+    st.session_state["trainer_options"] = trainer_options
 
     with st.sidebar:
         st.text_input("Search by task ID", key="search", on_change=search_evaluation, placeholder="e.g. 60000")
@@ -237,6 +245,13 @@ if evaluations_file:
             st.session_state["acc_options"],
             default=st.session_state.get("acc_choices", []),
             key="acc_choices"
+        )
+
+        st.multiselect(
+            "Trainer IDs",
+            st.session_state["trainer_options"],
+            default=st.session_state.get("trainer_choices", []),
+            key="trainer_choices"
         )
 
         st.subheader("Navigation")
