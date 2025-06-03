@@ -38,10 +38,10 @@ def search_evaluation():
 
 def fetch_filtered_df():
     filtered_df = st.session_state["df"]
-    filter_choices = st.session_state["filter_choices"]
-    abandon_choices = st.session_state["abandon_choices"]
-    classification_choices = st.session_state["classification_choices"]
-    acc_choices = st.session_state["acc_choices"]
+    filter_choices = st.session_state.get("filter_choices", [])
+    abandon_choices = st.session_state.get("abandon_choices", [])
+    classification_choices = st.session_state.get("classification_choices", [])
+    acc_choices = st.session_state.get("acc_choices", [])
     if "Abandoned" in filter_choices:
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
     if "Has interventions" in filter_choices:
@@ -203,38 +203,34 @@ if evaluations_file:
         st.text_input("Search in prompt and response", key="search_string", on_change=search_for_string)
 
         # Use current values from session state as defaults
-        filter_choices = st.multiselect(
+        st.multiselect(
             "Additional filters",
             FILTER_OPTIONS,
             default=st.session_state.get("filter_choices", []),
-            key="filters_additional"
+            key="filter_choices"
         )
-        st.session_state["filter_choices"] = filter_choices
 
         # Dynamic filters with preserved selections
-        abandon_choices = st.multiselect(
+        st.multiselect(
             "Abandon reason filters",
             st.session_state["abandon_options"],
             default=st.session_state.get("abandon_choices", []),
-            key="filters_abandon"
+            key="abandon_choices"
         )
-        st.session_state["abandon_choices"] = abandon_choices
 
-        classification_choices = st.multiselect(
+        st.multiselect(
             "Model performance classification",
             st.session_state["classification_options"],
             default=st.session_state.get("classification_choices", []),
-            key="filters_classification"
+            key="classification_choices"
         )
-        st.session_state["classification_choices"] = classification_choices
 
-        acc_choices = st.multiselect(
+        st.multiselect(
             "ACC level",
             st.session_state["acc_options"],
             default=st.session_state.get("acc_choices", []),
-            key="filters_acc"
+            key="acc_choices"
         )
-        st.session_state["acc_choices"] = acc_choices
 
         st.subheader("Navigation")
         scroll_navbar(
