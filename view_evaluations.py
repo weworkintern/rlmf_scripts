@@ -200,6 +200,13 @@ if evaluations_file:
         
         st.subheader("Search filters")
         
+        # Show filtered row count
+        if st.session_state.get("df") is not None:
+            filtered_df = fetch_filtered_df()
+            total_rows = len(st.session_state["df"])
+            filtered_rows = len(filtered_df)
+            st.text(f"Showing {filtered_rows} of {total_rows} rows")
+        
         st.text_input("Search in prompt and response", key="search_string", on_change=search_for_string)
 
         # Use current values from session state as defaults
