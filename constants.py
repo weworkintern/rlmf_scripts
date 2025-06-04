@@ -28,8 +28,12 @@ DATA_INFO = [
 ]
 
 FILTER_OPTIONS = [
+    "None",
     "Abandoned",
     "Has interventions",
+    "Not abandoned",
+    "No interventions",
+    "Has ground truth solutions"
 ]
 
 SCROLLBAR_STYLES = {

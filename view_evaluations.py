@@ -38,15 +38,23 @@ def search_evaluation():
 
 def fetch_filtered_df():
     filtered_df = st.session_state["df"]
-    filter_choices = st.session_state.get("filter_choices", [])
+    filter_choices = st.session_state.get("filter_choices", "None")
     abandon_choices = st.session_state.get("abandon_choices", [])
     classification_choices = st.session_state.get("classification_choices", [])
     trainer_choices = st.session_state.get("trainer_choices", [])
     acc_choices = st.session_state.get("acc_choices", [])
-    if "Abandoned" in filter_choices:
+
+    if filter_choices == "Abandoned":
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
-    if "Has interventions" in filter_choices:
+    if filter_choices == "Has interventions":
         filtered_df = filtered_df.filter(pl.col("intervention rounds") > 0)
+    if filter_choices == "Not abandoned":
+        filtered_df = filtered_df.filter(pl.col("abandon_prompt") != "Yes")
+    if filter_choices == "No interventions":
+        filtered_df = filtered_df.filter(pl.col("intervention rounds") == 0)
+    if filter_choices == "Has ground truth solutions":
+        filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_not_null())
+
     if len(abandon_choices) > 0:
         filtered_df = filtered_df.filter(pl.col("abandon_prompt_reason").is_in(abandon_choices))
     if len(classification_choices) > 0:
@@ -163,7 +171,7 @@ default_state = {
     "abandon_choices": [],
     "classification_choices": [],
     "acc_choices": [],
-    "filter_choices": [],
+    "filter_choices": "None",
     "trainer_options": [],
     "trainer_choices": []
 }
@@ -218,11 +226,11 @@ if evaluations_file:
         st.text_input("Search in prompt and response", key="search_string", on_change=search_for_string)
 
         # Use current values from session state as defaults
-        st.multiselect(
+        st.selectbox(
             "Additional filters",
             FILTER_OPTIONS,
-            default=st.session_state.get("filter_choices", []),
-            key="filter_choices"
+            key="filter_choices",
+            placeholder=None
         )
 
         # Dynamic filters with preserved selections
