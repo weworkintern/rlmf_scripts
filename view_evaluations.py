@@ -54,6 +54,8 @@ def fetch_filtered_df():
         filtered_df = filtered_df.filter(pl.col("intervention rounds") == 0)
     if filter_choices == "Has ground truth solutions":
         filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_not_null())
+    if filter_choices == "Has no ground truth solutions":
+        filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_null())
 
     if len(abandon_choices) > 0:
         filtered_df = filtered_df.filter(pl.col("abandon_prompt_reason").is_in(abandon_choices))

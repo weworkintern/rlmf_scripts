@@ -33,7 +33,8 @@ FILTER_OPTIONS = [
     "Has interventions",
     "Not abandoned",
     "No interventions",
-    "Has ground truth solutions"
+    "Has ground truth solutions",
+    "Has no ground truth solutions"
 ]
 
 SCROLLBAR_STYLES = {
