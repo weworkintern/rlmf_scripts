@@ -38,23 +38,22 @@ def search_evaluation():
 
 def fetch_filtered_df():
     filtered_df = st.session_state["df"]
-    filter_choices = st.session_state.get("filter_choices", "None")
     abandon_choices = st.session_state.get("abandon_choices", [])
     classification_choices = st.session_state.get("classification_choices", [])
     trainer_choices = st.session_state.get("trainer_choices", [])
     acc_choices = st.session_state.get("acc_choices", [])
 
-    if filter_choices == "Abandoned":
+    if st.session_state.get("abandon_filter") == "Abandoned":
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
-    if filter_choices == "Has interventions":
-        filtered_df = filtered_df.filter(pl.col("intervention rounds") > 0)
-    if filter_choices == "Not abandoned":
+    elif st.session_state.get("abandon_filter") == "Not abandoned":
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") != "Yes")
-    if filter_choices == "No interventions":
+    if st.session_state.get("intervention_filter") == "Has interventions":
+        filtered_df = filtered_df.filter(pl.col("intervention rounds") > 0)
+    elif st.session_state.get("intervention_filter") == "No interventions":
         filtered_df = filtered_df.filter(pl.col("intervention rounds") == 0)
-    if filter_choices == "Has ground truth solutions":
+    if st.session_state.get("ground_truth_solutions_filter") == "Has ground truth":
         filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_not_null())
-    if filter_choices == "Has no ground truth solutions":
+    elif st.session_state.get("ground_truth_solutions_filter") == "No ground truth":
         filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_null())
 
     if len(abandon_choices) > 0:
@@ -161,6 +160,11 @@ def search_for_string():
     else:
         st.write(f"No matches found for '{search_term}'")
 
+def clear_filters():
+    st.session_state["abandon_filter"] = None
+    st.session_state["intervention_filter"] = None
+    st.session_state["ground_truth_solutions_filter"] = None
+
 # Initialize session state variables with default values
 default_state = {
     "button_key_counter": 0,
@@ -228,12 +232,18 @@ if evaluations_file:
         st.text_input("Search in prompt and response", key="search_string", on_change=search_for_string)
 
         # Use current values from session state as defaults
-        st.selectbox(
-            "Additional filters",
-            FILTER_OPTIONS,
-            key="filter_choices",
-            placeholder=None
-        )
+        # st.selectbox(
+        #     "Additional filters",
+        #     FILTER_OPTIONS,
+        #     key="filter_choices",
+        #     placeholder=None
+        # )
+
+        with st.expander("Advanced filters"):
+            st.button("Clear all filters", on_click=clear_filters)
+            st.radio("Abandoned", ["Abandoned", "Not abandoned"], key="abandon_filter", index=None, label_visibility="collapsed")
+            st.radio("Interventions", ["Has interventions", "No interventions"], key="intervention_filter", index=None, label_visibility="collapsed")
+            st.radio("Ground truth solutions", ["Has ground truth", "No ground truth"], key="ground_truth_solutions_filter", index=None, label_visibility="collapsed")
 
         # Dynamic filters with preserved selections
         st.multiselect(
