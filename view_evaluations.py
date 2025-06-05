@@ -42,6 +42,7 @@ def fetch_filtered_df():
     classification_choices = st.session_state.get("classification_choices", [])
     trainer_choices = st.session_state.get("trainer_choices", [])
     acc_choices = st.session_state.get("acc_choices", [])
+    intervention_slider_filter = st.session_state.get("intervention_slider_filter", (0, 20))
 
     if st.session_state.get("abandon_filter") == "Abandoned":
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
@@ -64,6 +65,8 @@ def fetch_filtered_df():
         filtered_df = filtered_df.filter(pl.col("ACC").cast(pl.Float64, strict=False).is_in(acc_choices))
     if len(trainer_choices) > 0:
         filtered_df = filtered_df.filter(pl.col("trainer id").is_in(trainer_choices))
+    if intervention_slider_filter is not None:
+        filtered_df = filtered_df.filter(pl.col("intervention rounds").cast(pl.Int32, strict=False).is_between(intervention_slider_filter[0], intervention_slider_filter[1]))
     return filtered_df
 
 def get_filtered_indices():
@@ -179,7 +182,8 @@ default_state = {
     "acc_choices": [],
     "filter_choices": "None",
     "trainer_options": [],
-    "trainer_choices": []
+    "trainer_choices": [],
+    "intervention_slider_filter": (0, 20)
 }
 
 for key, default_value in default_state.items():
@@ -272,6 +276,16 @@ if evaluations_file:
             st.session_state["trainer_options"],
             default=st.session_state.get("trainer_choices", []),
             key="trainer_choices"
+        )
+
+        # Use a range slider so that the returned value is a tuple (min, max)
+        st.slider(
+            "Intervention rounds",
+            min_value=0,
+            max_value=20,
+            step=1,
+            value=st.session_state.get("intervention_slider_filter", (0, 20)),
+            key="intervention_slider_filter",
         )
 
         st.subheader("Navigation")
