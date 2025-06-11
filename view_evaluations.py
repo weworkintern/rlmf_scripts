@@ -107,8 +107,11 @@ def previous_evaluation():
         # If current index not in filtered set, move to last filtered index
         st.session_state["current_index"] = filtered_indices[-1]
     
+    df_slice = st.session_state["df"].slice(st.session_state["current_index"], 1)
+
     # Update search with task ID from original dataframe
-    st.session_state["search"] = str(st.session_state["df"].slice(st.session_state["current_index"], 1).get_column("task id").item())
+    st.session_state["search"] = str(df_slice.get_column("task id").item())
+    st.session_state["question_id_search"] = str(df_slice.get_column("question_id").item())
 
 def next_evaluation():
     filtered_indices = get_filtered_indices()
@@ -128,7 +131,9 @@ def next_evaluation():
         st.session_state["current_index"] = filtered_indices[0]
     
     # Update search with task ID from original dataframe
-    st.session_state["search"] = str(st.session_state["df"].slice(st.session_state["current_index"], 1).get_column("task id").item())
+    df_slice = st.session_state["df"].slice(st.session_state["current_index"], 1)
+    st.session_state["search"] = str(df_slice.get_column("task id").item())
+    st.session_state["question_id_search"] = str(df_slice.get_column("question_id").item())
 
 @st.dialog("Search Results")
 def search_for_string():
