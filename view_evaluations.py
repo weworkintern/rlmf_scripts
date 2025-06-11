@@ -31,6 +31,12 @@ def search_by_question_id():
     if matches.any():
         match_index = matches.arg_true().item(0)  # Get the first match index
         st.session_state["current_index"] = match_index
+        st.session_state["search_none"] = False
+        st.session_state["question_id_search_none"] = False
+        st.session_state["search"] = str(df.get_column("task id").item(match_index))
+        st.session_state["question_id_search"] = str(df.get_column("question_id").item(match_index))
+    else:
+        st.session_state["question_id_search_none"] = True
 
 def search_evaluation():
     """Search for a task ID and update the current index."""
@@ -45,6 +51,12 @@ def search_evaluation():
     if matches.any():
         match_index = matches.arg_true().item(0)  # Get the first match index
         st.session_state["current_index"] = match_index
+        st.session_state["question_id_search_none"] = False
+        st.session_state["search_none"] = False
+        st.session_state["question_id_search"] = search_term
+        st.session_state["search"] = str(df.get_column("task id").item(match_index))
+    else:
+        st.session_state["search_none"] = True
 
 def fetch_filtered_df():
     filtered_df = st.session_state["df"]
@@ -233,8 +245,12 @@ if evaluation_files and len(evaluation_files) > 0:
 
     with st.sidebar:
         st.text_input("Search by task ID", key="search", on_change=search_evaluation, placeholder="e.g. 60000")
+        if st.session_state.get("search_none", False) and st.session_state.get("search", ""):
+            st.caption(f"No tasks with task ID {st.session_state['search']} found")
 
         st.text_input("Search by question ID", key="question_id_search", on_change=search_by_question_id)
+        if st.session_state.get("question_id_search_none", False) and st.session_state.get("question_id_search", ""):
+            st.caption(f"No tasks with question ID {st.session_state['question_id_search']} found")
 
         # Buttons to control current index
         col1, col2 = st.columns(2)
