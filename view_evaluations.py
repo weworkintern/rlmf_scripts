@@ -22,6 +22,16 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
 
+def search_by_question_id():
+    search_term = st.session_state.get("question_id_search", "")
+    if not search_term:
+        return
+    qids = df.get_column("question_id").cast(pl.Utf8)
+    matches = qids.str.contains(search_term)
+    if matches.any():
+        match_index = matches.arg_true().item(0)  # Get the first match index
+        st.session_state["current_index"] = match_index
+
 def search_evaluation():
     """Search for a task ID and update the current index."""
     search_term = st.session_state.get("search", "")
@@ -216,6 +226,8 @@ if evaluations_file:
 
     with st.sidebar:
         st.text_input("Search by task ID", key="search", on_change=search_evaluation, placeholder="e.g. 60000")
+
+        st.text_input("Search by question ID", key="question_id_search", on_change=search_by_question_id)
 
         # Buttons to control current index
         col1, col2 = st.columns(2)
