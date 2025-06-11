@@ -148,11 +148,13 @@ def search_for_string():
         st.write(f"There are {matches.shape[0]} matches for '{search_term}'")
         for i in range(matches.shape[0]):
             task_id = matches.get_column('task id').item(i)
+            question_id = matches.get_column('question_id').item(i)
             prompt_item = matches.get_column('user prompt').item(i)
             response_item = matches.get_column('response').item(i)
 
             if st.button(f"Task {task_id}"):
                 st.session_state["search"] = str(task_id)
+                st.session_state["question_id_search"] = str(question_id)
                 search_evaluation()
                 st.rerun()
 
