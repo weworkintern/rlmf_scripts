@@ -209,9 +209,9 @@ for key, default_value in default_state.items():
 
 current_index = st.session_state.get("current_index", 0)
 
-evaluations_file = st.file_uploader("Upload evaluations file", type=["json", "csv"])
-if evaluations_file:
-    df = read_file(evaluations_file, evaluations_file.type)
+evaluation_files = st.file_uploader("Upload evaluations file", type=["json", "csv"], accept_multiple_files=True)
+if evaluation_files and len(evaluation_files) > 0:
+    df = pl.concat([read_file(evaluation_file, evaluation_file.type) for evaluation_file in evaluation_files])
 
     curr_df = df.slice(current_index, 1)
 
