@@ -53,7 +53,7 @@ def search_evaluation():
         st.session_state["current_index"] = match_index
         st.session_state["question_id_search_none"] = False
         st.session_state["search_none"] = False
-        st.session_state["question_id_search"] = search_term
+        st.session_state["question_id_search"] = str(df.get_column("question_id").item(match_index))
         st.session_state["search"] = str(df.get_column("task id").item(match_index))
     else:
         st.session_state["search_none"] = True
