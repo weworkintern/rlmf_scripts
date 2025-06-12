@@ -65,6 +65,7 @@ def fetch_filtered_df():
     trainer_choices = st.session_state.get("trainer_choices", [])
     acc_choices = st.session_state.get("acc_choices", [])
     intervention_slider_filter = st.session_state.get("intervention_slider_filter", (0, 20))
+    model_choices = st.session_state.get("model_choices", [])
 
     if st.session_state.get("abandon_filter") == "Abandoned":
         filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
@@ -79,6 +80,8 @@ def fetch_filtered_df():
     elif st.session_state.get("ground_truth_solutions_filter") == "No ground truth":
         filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_null())
 
+    if len(model_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("model name").is_in(model_choices))
     if len(abandon_choices) > 0:
         filtered_df = filtered_df.filter(pl.col("abandon_prompt_reason").is_in(abandon_choices))
     if len(classification_choices) > 0:
@@ -223,7 +226,7 @@ current_index = st.session_state.get("current_index", 0)
 
 evaluation_files = st.file_uploader("Upload evaluations file", type=["json", "csv"], accept_multiple_files=True)
 if evaluation_files and len(evaluation_files) > 0:
-    df = pl.concat([read_file(evaluation_file, evaluation_file.type) for evaluation_file in evaluation_files])
+    df = pl.concat([read_file(evaluation_file, evaluation_file.type) for evaluation_file in evaluation_files], how="diagonal")
 
     curr_df = df.slice(current_index, 1)
 
@@ -237,11 +240,14 @@ if evaluation_files and len(evaluation_files) > 0:
         acc_options = df.get_column("ACC").cast(pl.Float64, strict=False).unique().to_list()
     if "trainer id" in df.columns:
         trainer_options = df.get_column("trainer id").unique().to_list()
+    if "model name" in df.columns:
+        model_options = df.get_column("model name").unique().to_list()
 
     st.session_state["abandon_options"] = abandon_options
     st.session_state["classification_options"] = classification_options
     st.session_state["acc_options"] = acc_options
     st.session_state["trainer_options"] = trainer_options
+    st.session_state["model_options"] = model_options
 
     with st.sidebar:
         st.text_input("Search by task ID", key="search", on_change=search_evaluation, placeholder="e.g. 60000")
@@ -311,6 +317,13 @@ if evaluation_files and len(evaluation_files) > 0:
             st.session_state["trainer_options"],
             default=st.session_state.get("trainer_choices", []),
             key="trainer_choices"
+        )
+
+        st.multiselect(
+            "Model names",
+            st.session_state["model_options"],
+            default=st.session_state.get("model_choices", []),
+            key="model_choices"
         )
 
         # Use a range slider so that the returned value is a tuple (min, max)
