@@ -1,67 +1,16 @@
 import streamlit as st
 import polars as pl
+import ast
 import os
-import json
 from streamlit_shortcuts import button
 from dotenv import load_dotenv
 from streamlit_scroll_navigation import scroll_navbar
 from utils import parse_and_render_text, clean_text
-import ast
+from constants import DATA_VALS, DATA_INFO, SCROLLBAR_STYLES, FILTER_OPTIONS
 
 load_dotenv(override=True)
 DATA_DIR = os.getenv("DATA_DIR", "./data")
 
-DATA_VALS = {
-    "user prompt": "User Prompt",
-    "response": "Response",
-    "system prompt": "System Prompt",
-    "intervene_system_prompt": "Intervene System Prompt",
-    "intervene prompt": "Intervene User Prompt",
-    "final_answer": "Final Answer",
-    "ground_truth_answer": "Ground Truth Answer",
-}
-
-DATA_INFO = [
-    "task id",
-    "trainer id",
-    "model name",
-    "abandon_prompt",
-    "abandon_prompt_reason",
-    "temperature",
-    "intervention rounds",
-    "CoT quality",
-    "Model performance classification",
-    "codeforces_submission_id",
-    "programming_language",
-    "total_tokens",
-    "ACC",
-    "level",
-]
-
-SCROLLBAR_STYLES = {
-    "navbarButtonBase": {
-        "backgroundColor": "#f4f3ed",
-        "color": "#222",
-        "borderColor": "#d3d2ca"
-    },
-    "navbarButtonActive": {
-        "backgroundColor": "#bb5a38",
-        "color": "#fff",
-        "borderColor": "#bb5a38"
-    },
-    "navbarButtonHover": {
-        "backgroundColor": "#ecebe3",
-        "secondaryBackgroundColor": "#ecebe3",
-        "color": "#222",
-        "linkColor": "#222",
-        "borderColor": "#bb5a38"
-    },
-    "navigationBarBase": {
-        "backgroundColor": "#f4f3ed",
-        "color": "#222",
-        "borderColor": "#d3d2ca"
-    }
-}
 # df = pl.read_json(os.path.join(DATA_DIR, "evaluations.json"))
 
 st.set_page_config(layout="wide", page_title="CoT Viewer", page_icon="👀")
@@ -73,11 +22,21 @@ def read_file(file_path: str, file_type: str) -> pl.DataFrame:
     elif file_type == "text/csv":
         return pl.read_csv(file_path)
 
-if "button_key_counter" not in st.session_state:
-    st.session_state["button_key_counter"] = 0
-
-if "current_index" not in st.session_state:
-    st.session_state["current_index"] = 0
+def search_by_question_id():
+    search_term = st.session_state.get("question_id_search", "")
+    if not search_term:
+        return
+    qids = df.get_column("question_id").cast(pl.Utf8)
+    matches = qids.str.contains(search_term)
+    if matches.any():
+        match_index = matches.arg_true().item(0)  # Get the first match index
+        st.session_state["current_index"] = match_index
+        st.session_state["search_none"] = False
+        st.session_state["question_id_search_none"] = False
+        st.session_state["search"] = str(df.get_column("task id").item(match_index))
+        st.session_state["question_id_search"] = str(df.get_column("question_id").item(match_index))
+    else:
+        st.session_state["question_id_search_none"] = True
 
 def search_evaluation():
     """Search for a task ID and update the current index."""
@@ -91,39 +50,292 @@ def search_evaluation():
     matches = task_ids.str.contains(search_term)
     if matches.any():
         match_index = matches.arg_true().item(0)  # Get the first match index
-        print(f"Match index: {match_index}")
         st.session_state["current_index"] = match_index
+        st.session_state["question_id_search_none"] = False
+        st.session_state["search_none"] = False
+        st.session_state["question_id_search"] = str(df.get_column("question_id").item(match_index))
+        st.session_state["search"] = str(df.get_column("task id").item(match_index))
+    else:
+        st.session_state["search_none"] = True
+
+def fetch_filtered_df():
+    filtered_df = st.session_state["df"]
+    abandon_choices = st.session_state.get("abandon_choices", [])
+    classification_choices = st.session_state.get("classification_choices", [])
+    trainer_choices = st.session_state.get("trainer_choices", [])
+    acc_choices = st.session_state.get("acc_choices", [])
+    intervention_slider_filter = st.session_state.get("intervention_slider_filter", (0, 20))
+    model_choices = st.session_state.get("model_choices", [])
+
+    if st.session_state.get("abandon_filter") == "Abandoned":
+        filtered_df = filtered_df.filter(pl.col("abandon_prompt") == "Yes")
+    elif st.session_state.get("abandon_filter") == "Not abandoned":
+        filtered_df = filtered_df.filter(pl.col("abandon_prompt") != "Yes")
+    if st.session_state.get("intervention_filter") == "Has interventions":
+        filtered_df = filtered_df.filter(pl.col("intervention rounds") > 0)
+    elif st.session_state.get("intervention_filter") == "No interventions":
+        filtered_df = filtered_df.filter(pl.col("intervention rounds") == 0)
+    if st.session_state.get("ground_truth_solutions_filter") == "Has ground truth":
+        filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_not_null())
+    elif st.session_state.get("ground_truth_solutions_filter") == "No ground truth":
+        filtered_df = filtered_df.filter(pl.col("ground_truth_answer").is_null())
+
+    if len(model_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("model name").is_in(model_choices))
+    if len(abandon_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("abandon_prompt_reason").is_in(abandon_choices))
+    if len(classification_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("Model performance classification").is_in(classification_choices))
+    if len(acc_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("ACC").cast(pl.Float64, strict=False).is_in(acc_choices))
+    if len(trainer_choices) > 0:
+        filtered_df = filtered_df.filter(pl.col("trainer id").is_in(trainer_choices))
+    if intervention_slider_filter is not None:
+        filtered_df = filtered_df.filter(pl.col("intervention rounds").cast(pl.Int32, strict=False).is_between(intervention_slider_filter[0], intervention_slider_filter[1]))
+    return filtered_df
+
+def get_filtered_indices():
+    """Get the indices from the original dataframe that match the current filters."""
+    filtered_df = fetch_filtered_df()
+    # Get task IDs from filtered df
+    filtered_task_ids = filtered_df.get_column("task id").to_list()
+    # Get indices from original df where task ID matches filtered task IDs
+    original_indices = st.session_state["df"].with_row_index("index").filter(
+        pl.col("task id").is_in(filtered_task_ids)
+    ).get_column("index").to_list()
+    return original_indices
 
 def previous_evaluation():
-    if st.session_state["current_index"] > 0:
-        st.session_state["current_index"] -= 1
-    else:
-        st.session_state["current_index"] = len(df) - 1
-    st.session_state["search"] = str(df.slice(st.session_state["current_index"], 1).get_column("task id").item())
+    filtered_indices = get_filtered_indices()
+    if not filtered_indices:
+        return
+        
+    # Find the current position in filtered indices
+    try:
+        current_pos = filtered_indices.index(st.session_state["current_index"])
+        # Move to previous position in filtered indices
+        if current_pos > 0:
+            st.session_state["current_index"] = filtered_indices[current_pos - 1]
+        else:
+            st.session_state["current_index"] = filtered_indices[-1]
+    except ValueError:
+        # If current index not in filtered set, move to last filtered index
+        st.session_state["current_index"] = filtered_indices[-1]
+    
+    df_slice = st.session_state["df"].slice(st.session_state["current_index"], 1)
+
+    # Update search with task ID from original dataframe
+    st.session_state["search"] = str(df_slice.get_column("task id").item())
+    st.session_state["question_id_search"] = str(df_slice.get_column("question_id").item())
 
 def next_evaluation():
-    if st.session_state["current_index"] < len(df) - 1:
-        st.session_state["current_index"] += 1
+    filtered_indices = get_filtered_indices()
+    if not filtered_indices:
+        return
+        
+    # Find the current position in filtered indices
+    try:
+        current_pos = filtered_indices.index(st.session_state["current_index"])
+        # Move to next position in filtered indices
+        if current_pos < len(filtered_indices) - 1:
+            st.session_state["current_index"] = filtered_indices[current_pos + 1]
+        else:
+            st.session_state["current_index"] = filtered_indices[0]
+    except ValueError:
+        # If current index not in filtered set, move to first filtered index
+        st.session_state["current_index"] = filtered_indices[0]
+    
+    # Update search with task ID from original dataframe
+    df_slice = st.session_state["df"].slice(st.session_state["current_index"], 1)
+    st.session_state["search"] = str(df_slice.get_column("task id").item())
+    st.session_state["question_id_search"] = str(df_slice.get_column("question_id").item())
+
+@st.dialog("Search Results")
+def search_for_string():
+    search_term = st.session_state.get("search_string", "")
+    if not search_term:
+        return
+    
+    df = st.session_state["df"]
+
+    matches = df.filter(pl.col("user prompt").str.contains_any([search_term], ascii_case_insensitive=True) | pl.col("response").str.contains_any([search_term], ascii_case_insensitive=True))
+    if matches.shape[0] > 0:
+        st.write(f"There are {matches.shape[0]} matches for '{search_term}'")
+        for i in range(matches.shape[0]):
+            task_id = matches.get_column('task id').item(i)
+            question_id = matches.get_column('question_id').item(i)
+            prompt_item = matches.get_column('user prompt').item(i)
+            response_item = matches.get_column('response').item(i)
+
+            if st.button(f"Task {task_id}"):
+                st.session_state["search"] = str(task_id)
+                st.session_state["question_id_search"] = str(question_id)
+                search_evaluation()
+                st.rerun()
+
+            if search_term.lower() in prompt_item.lower():
+                idx = prompt_item.lower().index(search_term.lower())
+                prefix = "**Prompt:** "
+                if idx > 50 and len(prompt_item) - idx > 50:
+                    st.write(f"{prefix}...{prompt_item[idx-50:idx+50]}...")
+                elif idx <= 50:
+                    st.write(f"{prefix}{prompt_item[:100]}...")
+                else:
+                    st.write(f"{prefix}...{prompt_item[-100:]}")
+            if search_term.lower() in response_item.lower():
+                idx = response_item.lower().index(search_term.lower())
+                prefix = "**Response:** "
+                if idx > 50 and len(response_item) - idx > 50:
+                    st.write(f"{prefix}...{response_item[idx-50:idx+50]}...")
+                elif idx <= 50:
+                    st.write(f"{prefix}{response_item[:100]}...")
+                else:
+                    st.write(f"{prefix}...{response_item[-100:]}")
+            st.divider()
     else:
-        st.session_state["current_index"] = 0
-    st.session_state["search"] = str(df.slice(st.session_state["current_index"], 1).get_column("task id").item())
+        st.write(f"No matches found for '{search_term}'")
+
+def clear_filters():
+    st.session_state["abandon_filter"] = None
+    st.session_state["intervention_filter"] = None
+    st.session_state["ground_truth_solutions_filter"] = None
+
+# Initialize session state variables with default values
+default_state = {
+    "button_key_counter": 0,
+    "current_index": 0,
+    "search_string": "",
+    "abandon_options": [],
+    "classification_options": [],
+    "acc_options": [],
+    "filter_options": [],
+    "abandon_choices": [],
+    "classification_choices": [],
+    "acc_choices": [],
+    "filter_choices": "None",
+    "trainer_options": [],
+    "trainer_choices": [],
+    "intervention_slider_filter": (0, 20)
+}
+
+for key, default_value in default_state.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
 
 current_index = st.session_state.get("current_index", 0)
 
-evaluations_file = st.file_uploader("Upload evaluations file", type=["json", "csv"])
-if evaluations_file:
-    df = read_file(evaluations_file, evaluations_file.type)
+evaluation_files = st.file_uploader("Upload evaluations file", type=["json", "csv"], accept_multiple_files=True)
+if evaluation_files and len(evaluation_files) > 0:
+    df = pl.concat([read_file(evaluation_file, evaluation_file.type) for evaluation_file in evaluation_files], how="diagonal")
 
     curr_df = df.slice(current_index, 1)
 
+    st.session_state["df"] = df
+    st.session_state["curr_df"] = curr_df
+
+    abandon_options = df.get_column("abandon_prompt_reason").unique().to_list()
+    classification_options = df.get_column("Model performance classification").unique().to_list()
+    acc_options = []
+    if "ACC" in df.columns:
+        acc_options = df.get_column("ACC").cast(pl.Float64, strict=False).unique().to_list()
+    if "trainer id" in df.columns:
+        trainer_options = df.get_column("trainer id").unique().to_list()
+    if "model name" in df.columns:
+        model_options = df.get_column("model name").unique().to_list()
+
+    st.session_state["abandon_options"] = abandon_options
+    st.session_state["classification_options"] = classification_options
+    st.session_state["acc_options"] = acc_options
+    st.session_state["trainer_options"] = trainer_options
+    st.session_state["model_options"] = model_options
+
     with st.sidebar:
+        st.text_input("Search by task ID", key="search", on_change=search_evaluation, placeholder="e.g. 60000")
+        if st.session_state.get("search_none", False) and st.session_state.get("search", ""):
+            st.caption(f"No tasks with task ID {st.session_state['search']} found")
+
+        st.text_input("Search by question ID", key="question_id_search", on_change=search_by_question_id)
+        if st.session_state.get("question_id_search_none", False) and st.session_state.get("question_id_search", ""):
+            st.caption(f"No tasks with question ID {st.session_state['question_id_search']} found")
+
         # Buttons to control current index
         col1, col2 = st.columns(2)
         with col1:
             button("Previous", "ArrowLeft", previous_evaluation, use_container_width=True)
         with col2:
             button("Next", "ArrowRight", next_evaluation, use_container_width=True)
-        search = st.text_input("Search by task ID", key="search", on_change=search_evaluation)
+        
+        st.subheader("Search filters")
+        
+        # Show filtered row count
+        if st.session_state.get("df") is not None:
+            filtered_df = fetch_filtered_df()
+            total_rows = len(st.session_state["df"])
+            filtered_rows = len(filtered_df)
+            st.text(f"Showing {filtered_rows} of {total_rows} rows")
+        
+        st.text_input("Search in prompt and response", key="search_string", on_change=search_for_string)
+
+        # Use current values from session state as defaults
+        # st.selectbox(
+        #     "Additional filters",
+        #     FILTER_OPTIONS,
+        #     key="filter_choices",
+        #     placeholder=None
+        # )
+
+        with st.expander("Advanced filters"):
+            st.button("Clear all filters", on_click=clear_filters)
+            st.radio("Abandoned", ["Abandoned", "Not abandoned"], key="abandon_filter", index=None, label_visibility="collapsed")
+            st.radio("Interventions", ["Has interventions", "No interventions"], key="intervention_filter", index=None, label_visibility="collapsed")
+            st.radio("Ground truth solutions", ["Has ground truth", "No ground truth"], key="ground_truth_solutions_filter", index=None, label_visibility="collapsed")
+
+        # Dynamic filters with preserved selections
+        st.multiselect(
+            "Abandon reason filters",
+            st.session_state["abandon_options"],
+            default=st.session_state.get("abandon_choices", []),
+            key="abandon_choices"
+        )
+
+        st.multiselect(
+            "Model performance classification",
+            st.session_state["classification_options"],
+            default=st.session_state.get("classification_choices", []),
+            key="classification_choices"
+        )
+
+        st.multiselect(
+            "ACC level",
+            st.session_state["acc_options"],
+            default=st.session_state.get("acc_choices", []),
+            key="acc_choices"
+        )
+
+        st.multiselect(
+            "Trainer IDs",
+            st.session_state["trainer_options"],
+            default=st.session_state.get("trainer_choices", []),
+            key="trainer_choices"
+        )
+
+        st.multiselect(
+            "Model names",
+            st.session_state["model_options"],
+            default=st.session_state.get("model_choices", []),
+            key="model_choices"
+        )
+
+        # Use a range slider so that the returned value is a tuple (min, max)
+        st.slider(
+            "Intervention rounds",
+            min_value=0,
+            max_value=20,
+            step=1,
+            value=st.session_state.get("intervention_slider_filter", (0, 20)),
+            key="intervention_slider_filter",
+        )
+
         st.subheader("Navigation")
         scroll_navbar(
             key="main",
@@ -186,6 +398,8 @@ if evaluations_file:
     st.table(remarks_dict["remarks"])
 
     for (name, title) in DATA_VALS.items():
+        if name not in curr_df.columns:
+            continue
         val = curr_df.get_column(name).item()
         st.header(title, anchor=title)
         if not val:
@@ -208,4 +422,5 @@ if evaluations_file:
 else:
     st.info("Upload an evaluation file to view")
 
+# Hide all anchor icons
 st.html("<style>[data-testid='stHeaderActionElements'] {display: none;}</style>")
