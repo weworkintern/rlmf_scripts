@@ -60,11 +60,12 @@ def search_evaluation():
 
 def fetch_filtered_df():
     filtered_df = st.session_state["df"]
+    highest_intervention_round = filtered_df.get_column("intervention rounds").max()
     abandon_choices = st.session_state.get("abandon_choices", [])
     classification_choices = st.session_state.get("classification_choices", [])
     trainer_choices = st.session_state.get("trainer_choices", [])
     acc_choices = st.session_state.get("acc_choices", [])
-    intervention_slider_filter = st.session_state.get("intervention_slider_filter", (0, 20))
+    intervention_slider_filter = st.session_state.get("intervention_slider_filter", (0, highest_intervention_round))
     model_choices = st.session_state.get("model_choices", [])
 
     if st.session_state.get("abandon_filter") == "Abandoned":
@@ -215,7 +216,7 @@ default_state = {
     "filter_choices": "None",
     "trainer_options": [],
     "trainer_choices": [],
-    "intervention_slider_filter": (0, 20)
+    "intervention_slider_filter": (0, 25)
 }
 
 for key, default_value in default_state.items():
@@ -229,6 +230,8 @@ if evaluation_files and len(evaluation_files) > 0:
     df = pl.concat([read_file(evaluation_file, evaluation_file.type) for evaluation_file in evaluation_files], how="diagonal")
 
     curr_df = df.slice(current_index, 1)
+
+    highest_intervention_round = df.get_column("intervention rounds").max()
 
     st.session_state["df"] = df
     st.session_state["curr_df"] = curr_df
@@ -330,9 +333,9 @@ if evaluation_files and len(evaluation_files) > 0:
         st.slider(
             "Intervention rounds",
             min_value=0,
-            max_value=20,
+            max_value=highest_intervention_round,
             step=1,
-            value=st.session_state.get("intervention_slider_filter", (0, 20)),
+            value=st.session_state.get("intervention_slider_filter", (0, highest_intervention_round)),
             key="intervention_slider_filter",
         )
 
