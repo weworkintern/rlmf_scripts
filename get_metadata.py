@@ -33,8 +33,6 @@ COLUMN_MAPPING = {
     'programming_language': 'programming_language',
 }
 
-DATA_DIRECTORY = '/Users/bytedance/Workspace/project_rlmf/data/ALL'
-
 def process_json_files(data_dir):
     all_processed_items = []
     all_column_names = set(COLUMN_MAPPING.values()) # Start with mapped names
