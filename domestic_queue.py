@@ -20,10 +20,16 @@ current_index = st.session_state.get("current_index", 0)
 
 def next_evaluation():
     st.session_state["current_index"] += 1
+    st.session_state["search"] = str(
+        df.get_column("link").item(st.session_state["current_index"])
+    )
 
 
 def previous_evaluation():
     st.session_state["current_index"] -= 1
+    st.session_state["search"] = str(
+        df.get_column("link").item(st.session_state["current_index"])
+    )
 
 
 @st.cache_data
@@ -55,6 +61,30 @@ def retrieve_stats(df: pl.DataFrame) -> pl.DataFrame:
         )
     )
     return stats
+
+
+def search_evaluation():
+    """Search for a task ID and update the current index."""
+    search_term = st.session_state.get("search", "")
+    if not search_term:
+        return
+
+    # Convert task IDs to strings for searching
+    task_ids = df.get_column("link").cast(pl.Utf8)
+    # Find the index of the first matching task ID
+    matches = task_ids.str.to_lowercase().str.contains(search_term.lower())
+    if matches.any():
+        match_index = matches.arg_true().item(0)  # Get the first match index
+        print(match_index)
+        st.session_state["current_index"] = match_index
+        st.session_state["question_id_search_none"] = False
+        st.session_state["search_none"] = False
+        st.session_state["question_id_search"] = str(
+            df.get_column("link").item(match_index)
+        )
+        st.session_state["search"] = str(df.get_column("link").item(match_index))
+    else:
+        st.session_state["search_none"] = True
 
 
 evaluation_file = st.file_uploader("Upload exported data", type=["jsonl"])
@@ -134,10 +164,27 @@ if evaluation_file:
         with col2:
             button("Next", "ArrowRight", next_evaluation, use_container_width=True)
 
+        st.text_input(
+            "Search by task ID",
+            key="search",
+            on_change=search_evaluation,
+            placeholder="e.g. 739D",
+        )
+        if st.session_state.get("search_none", False) and st.session_state.get(
+            "search", ""
+        ):
+            st.caption(f"No tasks with task ID {st.session_state['search']} found")
+
         st.subheader("Navigation")
         scroll_navbar(
             key="main",
-            anchor_ids=["Prompt", "Reasoning Steps", "Final Answer", "Raw Data"],
+            anchor_ids=[
+                "Data Info",
+                "Prompt",
+                "Reasoning Steps",
+                "Final Answer",
+                "Raw Data",
+            ],
             override_styles=SCROLLBAR_STYLES,
         )
 
