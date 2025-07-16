@@ -183,6 +183,7 @@ if evaluation_file:
                 "Prompt",
                 "Reasoning Steps",
                 "Final Answer",
+                "Ground Truth",
                 "Raw Data",
             ],
             override_styles=SCROLLBAR_STYLES,
@@ -201,9 +202,23 @@ if evaluation_file:
                 override_styles=SCROLLBAR_STYLES,
             )
 
-    st.header("Ground Truth", anchor="Ground Truth")
-    st.write("```cpp\n" + answer_data["gt_answer"] + "\n```")
+    if answer_data["gt_answer"]:
+        st.header("Ground Truth", anchor="Ground Truth")
+        st.write("```cpp\n" + answer_data["gt_answer"] + "\n```")
 
     st.header("Raw Data", anchor="Raw Data")
-    st.dataframe(curr_df)
-    st.json(curr_df["Answer"].item())
+    try:
+        st.dataframe(curr_df)
+    except Exception as e:
+        st.error(f"Error displaying dataframe: {e}")
+        st.write("Raw data structure:")
+        st.write(curr_df.dtypes)
+
+    try:
+        st.json(curr_df["Answer"].item())
+    except Exception as e:
+        st.error(f"Error displaying Answer column: {e}")
+        if "Answer" in curr_df.columns:
+            st.write("Answer column info:")
+            st.write(f"Type: {type(curr_df['Answer'].iloc[0])}")
+            st.write(f"Value: {curr_df['Answer'].iloc[0]}")
